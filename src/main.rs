@@ -1,14 +1,6 @@
-#[macro_use] extern crate rocket;
+use zero2prod::run;
 
-#[get("/health_check")]
-async fn health_check() -> () {
-    ()
-}
-
-#[launch]
-fn rocket() -> _ {
-    rocket::build()
-        .mount("/", routes![
-            health_check
-        ])
+#[rocket::main]
+async fn main() -> Result<(), rocket::Error> {
+    run().await
 }
