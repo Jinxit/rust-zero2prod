@@ -2,8 +2,7 @@
 extern crate rocket;
 
 #[get("/health_check")]
-async fn health_check() -> () {
-    ()
+async fn health_check() {
 }
 
 pub async fn run() -> Result<(), rocket::Error> {
