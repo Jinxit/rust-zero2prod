@@ -1,6 +1,6 @@
-use zero2prod::run;
+use zero2prod::build;
 
 #[rocket::main]
 async fn main() -> Result<(), rocket::Error> {
-    run().await
+    build(Some(8000)).await?.0.launch().await
 }
