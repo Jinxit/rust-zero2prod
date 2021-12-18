@@ -1,8 +1,8 @@
 #[macro_use]
 extern crate rocket;
 
-use rocket::{Config, Ignite, Orbit, Rocket};
 use rocket::fairing::Info;
+use rocket::{Config, Ignite, Orbit, Rocket};
 
 use tokio::sync::mpsc;
 
@@ -13,10 +13,7 @@ pub struct Port {
 
 impl Port {
     fn new(rx: mpsc::Receiver<u16>) -> Port {
-        Port {
-            port: None,
-            rx
-        }
+        Port { port: None, rx }
     }
 
     pub async fn get(&mut self) -> u16 {
@@ -32,14 +29,12 @@ impl Port {
 }
 
 struct PortSaver {
-    sender: mpsc::Sender<u16>
+    sender: mpsc::Sender<u16>,
 }
 
 impl PortSaver {
     fn new(sender: mpsc::Sender<u16>) -> PortSaver {
-        PortSaver {
-            sender
-        }
+        PortSaver { sender }
     }
 }
 
@@ -48,7 +43,7 @@ impl rocket::fairing::Fairing for PortSaver {
     fn info(&self) -> Info {
         Info {
             name: "Port Saver",
-            kind: rocket::fairing::Kind::Liftoff
+            kind: rocket::fairing::Kind::Liftoff,
         }
     }
 
@@ -67,11 +62,9 @@ pub async fn build(port: Option<u16>) -> Result<(Rocket<Ignite>, Port), rocket::
         port: port.unwrap_or(0),
         ..Config::debug_default()
     })
-        .attach(port_saver)
-        .mount("/", routes![health_check])
-        .ignite()
-        .await
-        .map(|rocket| {
-            (rocket, Port::new(rx))
-        })
+    .attach(port_saver)
+    .mount("/", routes![health_check])
+    .ignite()
+    .await
+    .map(|rocket| (rocket, Port::new(rx)))
 }
