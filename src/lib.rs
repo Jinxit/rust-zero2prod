@@ -2,7 +2,12 @@
 extern crate rocket;
 
 use rocket::fairing::Info;
-use rocket::{Config, Ignite, Orbit, Rocket};
+use rocket::{Config, Ignite, Orbit, Request, Rocket};
+use rocket::form::Form;
+use rocket::response::status;
+use rocket::response::status::BadRequest;
+
+// PORT
 
 use tokio::sync::mpsc;
 
@@ -52,8 +57,28 @@ impl rocket::fairing::Fairing for PortSaver {
     }
 }
 
+// FORMS
+
+#[derive(FromForm)]
+struct FormData {
+    name: String,
+    email: String,
+}
+
+// API
+
 #[get("/health_check")]
 async fn health_check() {}
+
+#[post("/subscriptions", data = "<form>")]
+async fn subscribe(form: Form<FormData>) {}
+
+// ERRORS
+
+#[catch(422)]
+fn unprocessable_entity(_req: &Request) -> BadRequest<()> {
+    status::BadRequest::<()>(None)
+}
 
 pub async fn build(port: Option<u16>) -> Result<(Rocket<Ignite>, Port), rocket::Error> {
     let (tx, rx) = mpsc::channel(1);
@@ -62,9 +87,10 @@ pub async fn build(port: Option<u16>) -> Result<(Rocket<Ignite>, Port), rocket::
         port: port.unwrap_or(0),
         ..Config::debug_default()
     })
-    .attach(port_saver)
-    .mount("/", routes![health_check])
-    .ignite()
-    .await
-    .map(|rocket| (rocket, Port::new(rx)))
+        .attach(port_saver)
+        .mount("/", routes![health_check, subscribe])
+        .register("/", catchers![unprocessable_entity])
+        .ignite()
+        .await
+        .map(|rocket| (rocket, Port::new(rx)))
 }
