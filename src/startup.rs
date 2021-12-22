@@ -3,7 +3,6 @@ use crate::port_saver;
 use crate::port_saver::Port;
 use crate::routes::*;
 use rocket::{Config, Ignite, Rocket};
-use tokio::sync::mpsc;
 
 pub async fn build(server_port: Option<u16>) -> Result<(Rocket<Ignite>, Port), rocket::Error> {
     let (port_saver, port) = port_saver::create_pair();

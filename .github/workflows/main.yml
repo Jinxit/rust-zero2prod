@@ -12,13 +12,56 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+    env:
+      DIESEL_VERSION: "1.4.4"
+      DIESEL_FEATURES: postgres
     steps:
       - uses: actions/checkout@v2
+      - id: cache-dependencies
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           override: true
+
+      - id: cache-diesel
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/bin/diesel
+          key: ${{ runner.os }}-diesel-${{ env.DIESEL_VERSION }}-${{ env.DIESEL_FEATURES }}
+      - uses: actions-rs/cargo@v1
+        if: steps.cache-diesel.outputs.cache-hit == false
+        with:
+          command: install
+          args: >
+            diesel_cli
+            --force
+            --version=${{ env.DIESEL_VERSION }}
+            --features=${{ env.DIESEL_FEATURES }}
+            --no-default-features
+            --locked
+
+      - run: |
+          sudo apt-get install libpq-dev -y
+          SKIP_DOCKER=true ./scripts/init_db.sh
+
       - uses: actions-rs/cargo@v1
         with:
           command: test
