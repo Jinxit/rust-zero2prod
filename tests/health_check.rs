@@ -69,7 +69,7 @@ async fn subscribe_returns_a_400_when_data_is_missing() {
 }
 
 async fn spawn_app() -> String {
-    let (app, mut port) = zero2prod::build(Some(0)).await.unwrap();
+    let (app, mut port) = zero2prod::startup::build(Some(0)).await.unwrap();
     //let client = rocket::local::blocking::Client::tracked(app).unwrap();
     let _ = tokio::spawn(app.launch());
     format!("http://127.0.0.1:{}", port.get().await)
