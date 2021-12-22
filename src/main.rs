@@ -1,6 +1,13 @@
+use zero2prod::configuration::get_configuration;
 use zero2prod::startup::build;
 
 #[rocket::main]
 async fn main() -> Result<(), rocket::Error> {
-    build(Some(8000)).await?.0.launch().await
+    let configuration = get_configuration().expect("Failed to read configuration.");
+
+    build(Some(configuration.application_port))
+        .await?
+        .0
+        .launch()
+        .await
 }
