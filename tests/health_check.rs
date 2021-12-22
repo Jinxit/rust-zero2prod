@@ -1,3 +1,10 @@
+use diesel::prelude::*;
+use diesel::{Connection, PgConnection};
+use zero2prod::configuration::get_configuration;
+use zero2prod::models::*;
+use zero2prod::schema::subscriptions::dsl::*;
+use zero2prod::schema::subscriptions::star;
+
 #[tokio::test]
 async fn health_check_works() {
     // arrange
@@ -21,6 +28,13 @@ async fn health_check_works() {
 async fn subscribe_returns_a_200_for_valid_form_data() {
     // arrange
     let address = spawn_app().await;
+
+    let configuration = get_configuration().expect("Failed to read configuration");
+
+    let connection_string = configuration.database.connection_string();
+    let connection =
+        PgConnection::establish(&connection_string).expect("Failed to connect to Postgres.");
+
     let client = reqwest::Client::new();
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
 
@@ -35,6 +49,13 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
 
     // assert
     assert_eq!(200, response.status().as_u16());
+
+    let saved = subscriptions
+        .first::<Subscription>(&connection)
+        .expect("Result set was empty.");
+
+    assert_eq!(saved.email, "ursula_le_guin@gmail.com");
+    assert_eq!(saved.name, "le guin");
 }
 
 #[tokio::test]
