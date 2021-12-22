@@ -1,4 +1,4 @@
-use zero2prod::build;
+use zero2prod::startup::build;
 
 #[rocket::main]
 async fn main() -> Result<(), rocket::Error> {
