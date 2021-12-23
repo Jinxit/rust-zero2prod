@@ -3,7 +3,7 @@ use serde;
 #[derive(serde::Deserialize)]
 pub struct Settings {
     pub database: DatabaseSettings,
-    pub application_port: u16,
+    pub application_port: Option<u16>,
 }
 
 #[derive(serde::Deserialize)]

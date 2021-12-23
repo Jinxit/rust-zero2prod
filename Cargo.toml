@@ -20,7 +20,7 @@ diesel = { version = "1.4.4", features = ["postgres", "chrono", "uuidv07"] }
 dotenv = "0.15.0"
 config = "0.11.0"
 serde = "1.0.132"
-uuid = "0.8.2"
+uuid = { version = "0.8.2", features = ["v4"] }
 chrono = "0.4.19"
 
 [dev-dependencies]

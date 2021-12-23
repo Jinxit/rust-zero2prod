@@ -5,9 +5,5 @@ use zero2prod::startup::build;
 async fn main() -> Result<(), rocket::Error> {
     let configuration = get_configuration().expect("Failed to read configuration.");
 
-    build(Some(configuration.application_port))
-        .await?
-        .0
-        .launch()
-        .await
+    build(&configuration).await?.0.launch().await
 }
