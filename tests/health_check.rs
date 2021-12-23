@@ -1,9 +1,8 @@
 use diesel::prelude::*;
 use diesel::{Connection, PgConnection};
-use zero2prod::configuration::get_configuration;
+use zero2prod::configuration::{get_configuration, Settings};
 use zero2prod::models::*;
 use zero2prod::schema::subscriptions::dsl::*;
-use zero2prod::schema::subscriptions::star;
 
 #[tokio::test]
 async fn health_check_works() {
@@ -90,8 +89,10 @@ async fn subscribe_returns_a_400_when_data_is_missing() {
 }
 
 async fn spawn_app() -> String {
-    let (app, mut port) = zero2prod::startup::build(Some(0)).await.unwrap();
-    //let client = rocket::local::blocking::Client::tracked(app).unwrap();
+    let mut configuration = get_configuration().expect("Failed to read configuration.");
+    configuration.application_port = Some(0);
+    let (app, mut port) = zero2prod::startup::build(&configuration).await.unwrap();
+
     let _ = tokio::spawn(app.launch());
     format!("http://127.0.0.1:{}", port.get().await)
 }
