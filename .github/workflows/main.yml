@@ -22,7 +22,7 @@ jobs:
         ports:
           - 5432:5432
     env:
-      DIESEL_VERSION: "1.4.4"
+      DIESEL_VERSION: "1.4.1"
       DIESEL_FEATURES: postgres
     steps:
       - uses: actions/checkout@v2
