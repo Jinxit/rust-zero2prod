@@ -1,7 +1,6 @@
 use crate::models::NewSubscription;
 use crate::startup::NewsletterDbConn;
 use chrono::Utc;
-use diesel::result::Error;
 use diesel::RunQueryDsl;
 use rocket::form::Form;
 use uuid::Uuid;

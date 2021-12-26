@@ -1,5 +1,6 @@
 use diesel::prelude::*;
 use diesel::{Connection, PgConnection};
+use uuid::Uuid;
 use zero2prod::configuration::{get_configuration, Settings};
 use zero2prod::models::*;
 use zero2prod::schema::subscriptions::dsl::*;
@@ -91,8 +92,30 @@ async fn subscribe_returns_a_400_when_data_is_missing() {
 async fn spawn_app() -> String {
     let mut configuration = get_configuration().expect("Failed to read configuration.");
     configuration.application_port = Some(0);
-    let (app, mut port) = zero2prod::startup::build(&configuration).await.unwrap();
+    configuration.database.database_name = Uuid::new_v4().to_string();
 
+    setup_database(&configuration);
+
+    let (app, mut port) = zero2prod::startup::build(&configuration).await.unwrap();
     let _ = tokio::spawn(app.launch());
     format!("http://127.0.0.1:{}", port.get().await)
+}
+
+fn setup_database(configuration: &Settings) {
+    let connection_string = configuration.database.connection_string_without_database();
+    let connection =
+        PgConnection::establish(&connection_string).expect("Failed to connect to Postgres.");
+
+    diesel::sql_query(format!(
+        "CREATE DATABASE \"{}\"",
+        configuration.database.database_name
+    ))
+    .execute(&connection)
+    .unwrap();
+
+    let connection_string = configuration.database.connection_string();
+    let connection =
+        PgConnection::establish(&connection_string).expect("Failed to connect to Postgres.");
+
+    diesel_migrations::run_pending_migrations(&connection).unwrap();
 }
