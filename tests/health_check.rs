@@ -8,7 +8,7 @@ use zero2prod::schema::subscriptions::dsl::*;
 #[tokio::test]
 async fn health_check_works() {
     // arrange
-    let address = spawn_app().await;
+    let (address, _) = spawn_app().await;
 
     let client = reqwest::Client::new();
 
@@ -27,9 +27,7 @@ async fn health_check_works() {
 #[tokio::test]
 async fn subscribe_returns_a_200_for_valid_form_data() {
     // arrange
-    let address = spawn_app().await;
-
-    let configuration = get_configuration().expect("Failed to read configuration");
+    let (address, configuration) = spawn_app().await;
 
     let connection_string = configuration.database.connection_string();
     let connection =
@@ -61,7 +59,7 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
 #[tokio::test]
 async fn subscribe_returns_a_400_when_data_is_missing() {
     // arrange
-    let address = spawn_app().await;
+    let (address, _) = spawn_app().await;
     let client = reqwest::Client::new();
     let test_cases = vec![
         ("name=le%20guin", "missing the email"),
@@ -89,7 +87,7 @@ async fn subscribe_returns_a_400_when_data_is_missing() {
     }
 }
 
-async fn spawn_app() -> String {
+async fn spawn_app() -> (String, Settings) {
     let mut configuration = get_configuration().expect("Failed to read configuration.");
     configuration.application_port = Some(0);
     configuration.database.database_name = Uuid::new_v4().to_string();
@@ -98,7 +96,10 @@ async fn spawn_app() -> String {
 
     let (app, mut port) = zero2prod::startup::build(&configuration).await.unwrap();
     let _ = tokio::spawn(app.launch());
-    format!("http://127.0.0.1:{}", port.get().await)
+    (
+        format!("http://127.0.0.1:{}", port.get().await),
+        configuration,
+    )
 }
 
 fn setup_database(configuration: &Settings) {
