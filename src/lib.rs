@@ -10,3 +10,4 @@ pub mod port_saver;
 pub mod routes;
 pub mod schema;
 pub mod startup;
+pub mod telemetry;
