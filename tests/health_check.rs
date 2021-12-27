@@ -57,6 +57,46 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
 }
 
 #[tokio::test]
+async fn subscribe_returns_a_500_for_duplicate_email() {
+    // arrange
+    let (address, configuration) = spawn_app().await;
+
+    let connection_string = configuration.database.connection_string();
+    let connection =
+        PgConnection::establish(&connection_string).expect("Failed to connect to Postgres.");
+
+    let client = reqwest::Client::new();
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+
+    // act
+    client
+        .post(&format!("{}/subscriptions", &address))
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body(body)
+        .send()
+        .await
+        .expect("Failed to execute request.");
+
+    let response = client
+        .post(&format!("{}/subscriptions", &address))
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body(body)
+        .send()
+        .await
+        .expect("Failed to execute request.");
+
+    // assert
+    assert_eq!(500, response.status().as_u16());
+
+    let saved = subscriptions
+        .first::<Subscription>(&connection)
+        .expect("Result set was empty.");
+
+    assert_eq!(saved.email, "ursula_le_guin@gmail.com");
+    assert_eq!(saved.name, "le guin");
+}
+
+#[tokio::test]
 async fn subscribe_returns_a_400_when_data_is_missing() {
     // arrange
     let (address, _) = spawn_app().await;
