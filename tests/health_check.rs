@@ -145,7 +145,7 @@ async fn spawn_app() -> (String, Settings) {
     Lazy::force(&TRACING);
 
     let mut configuration = get_configuration().expect("Failed to read configuration.");
-    configuration.application_port = Some(0);
+    configuration.application.port = Some(0);
     configuration.database.database_name = Uuid::new_v4().to_string();
 
     setup_database(&configuration);
