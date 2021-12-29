@@ -29,6 +29,7 @@ pub struct DatabaseSettings {
     pub port: u16,
     pub host: String,
     pub database_name: String,
+    pub require_ssl: bool,
 }
 
 impl Environment {
@@ -58,16 +59,32 @@ impl TryFrom<String> for Environment {
 impl DatabaseSettings {
     pub fn connection_string(&self) -> String {
         format!(
-            "postgres://{}:{}@{}:{}/{}",
-            self.username, self.password, self.host, self.port, self.database_name
+            "postgres://{}:{}@{}:{}/{}?sslmode={}",
+            self.username,
+            self.password,
+            self.host,
+            self.port,
+            self.database_name,
+            ssl_mode(self.require_ssl)
         )
     }
 
     pub fn connection_string_without_database(&self) -> String {
         format!(
-            "postgres://{}:{}@{}:{}",
-            self.username, self.password, self.host, self.port
+            "postgres://{}:{}@{}:{}?sslmode={}",
+            self.username,
+            self.password,
+            self.host,
+            self.port,
+            ssl_mode(self.require_ssl)
         )
+    }
+}
+
+fn ssl_mode(require_ssl: bool) -> &'static str {
+    match require_ssl {
+        true => "require",
+        false => "prefer",
     }
 }
 
