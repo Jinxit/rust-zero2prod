@@ -1394,6 +1394,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-aux"
+version = "3.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "93abf9799c576f004252b2a05168d58527fb7c54de12e94b4d12fe3475ffad24"
+dependencies = [
+ "chrono",
+ "serde 1.0.132",
+ "serde_json",
+]
+
+[[package]]
 name = "serde-hjson"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2069,6 +2080,7 @@ dependencies = [
  "rocket",
  "rocket_sync_db_pools",
  "serde 1.0.132",
+ "serde-aux",
  "tokio",
  "tracing",
  "tracing-bunyan-formatter",

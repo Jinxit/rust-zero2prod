@@ -36,8 +36,9 @@ pub async fn build(settings: &Settings) -> Result<(Rocket<Ignite>, Port), rocket
                     map![settings.database.database_name.clone() => db],
                 ))
                 .merge(Config {
-                    port: settings.application_port.unwrap_or(0),
-                    ..Config::debug_default()
+                    port: settings.application.port.unwrap_or(0),
+                    address: settings.application.host,
+                    ..Config::default()
                 }),
         )
         .attach(port_saver)
