@@ -1,3 +1,4 @@
+use crate::domain::{NewSubscriber, SubscriberName};
 use crate::models::NewSubscription;
 use crate::startup::NewsletterDbConn;
 use chrono::Utc;
@@ -23,7 +24,16 @@ pub struct FormData {
 )]
 #[post("/subscriptions", data = "<form>")]
 pub async fn subscribe(form: Form<FormData>, conn: NewsletterDbConn) -> Result<(), Status> {
-    match insert_subscriber(form.into_inner(), conn).await {
+    let form = form.into_inner();
+    let name = match SubscriberName::parse(form.name) {
+        Ok(name) => name,
+        Err(_) => return Err(Status::BadRequest),
+    };
+    let new_subscriber = NewSubscriber {
+        email: form.email,
+        name,
+    };
+    match insert_subscriber(new_subscriber, conn).await {
         Ok(_) => Ok(()),
         Err(e) => {
             tracing::error!("Failed to execute query: {:?}", e);
@@ -34,16 +44,19 @@ pub async fn subscribe(form: Form<FormData>, conn: NewsletterDbConn) -> Result<(
 
 #[tracing::instrument(
     name = "Saving new subscriber details in the database",
-    skip(form, conn)
+    skip(new_subscriber, conn)
 )]
-async fn insert_subscriber(form: FormData, conn: NewsletterDbConn) -> diesel::QueryResult<usize> {
+async fn insert_subscriber(
+    new_subscriber: NewSubscriber,
+    conn: NewsletterDbConn,
+) -> diesel::QueryResult<usize> {
     use crate::schema::subscriptions;
     conn.run(move |c| {
         diesel::insert_into(subscriptions::table)
             .values(NewSubscription {
                 id: &Uuid::new_v4(),
-                email: &form.email,
-                name: &form.name,
+                email: &new_subscriber.email,
+                name: &new_subscriber.name.as_ref(),
                 subscribed_at: &Utc::now(),
             })
             .execute(c)
