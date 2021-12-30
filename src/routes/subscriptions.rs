@@ -61,8 +61,8 @@ async fn insert_subscriber(
         diesel::insert_into(subscriptions::table)
             .values(NewSubscription {
                 id: &Uuid::new_v4(),
-                email: &new_subscriber.email.as_ref(),
-                name: &new_subscriber.name.as_ref(),
+                email: new_subscriber.email.as_ref(),
+                name: new_subscriber.name.as_ref(),
                 subscribed_at: &Utc::now(),
             })
             .execute(c)
