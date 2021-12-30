@@ -1,4 +1,5 @@
-use crate::domain::{NewSubscriber, SubscriberName};
+use crate::domain::SubscriberName;
+use crate::domain::{NewSubscriber, SubscriberEmail};
 use crate::models::NewSubscription;
 use crate::startup::NewsletterDbConn;
 use chrono::Utc;
@@ -13,6 +14,16 @@ pub struct FormData {
     email: String,
 }
 
+impl TryFrom<FormData> for NewSubscriber {
+    type Error = String;
+
+    fn try_from(form: FormData) -> Result<Self, Self::Error> {
+        let email = SubscriberEmail::parse(form.email)?;
+        let name = SubscriberName::parse(form.name)?;
+        Ok(NewSubscriber { email, name })
+    }
+}
+
 #[tracing::instrument(
     name = "Adding a new subscriber",
     skip(form, conn),
@@ -24,14 +35,9 @@ pub struct FormData {
 )]
 #[post("/subscriptions", data = "<form>")]
 pub async fn subscribe(form: Form<FormData>, conn: NewsletterDbConn) -> Result<(), Status> {
-    let form = form.into_inner();
-    let name = match SubscriberName::parse(form.name) {
-        Ok(name) => name,
+    let new_subscriber = match form.into_inner().try_into() {
+        Ok(subscriber) => subscriber,
         Err(_) => return Err(Status::BadRequest),
-    };
-    let new_subscriber = NewSubscriber {
-        email: form.email,
-        name,
     };
     match insert_subscriber(new_subscriber, conn).await {
         Ok(_) => Ok(()),
@@ -55,7 +61,7 @@ async fn insert_subscriber(
         diesel::insert_into(subscriptions::table)
             .values(NewSubscription {
                 id: &Uuid::new_v4(),
-                email: &new_subscriber.email,
+                email: &new_subscriber.email.as_ref(),
                 name: &new_subscriber.name.as_ref(),
                 subscribed_at: &Utc::now(),
             })
