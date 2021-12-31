@@ -6,6 +6,7 @@ extern crate diesel;
 pub mod catchers;
 pub mod configuration;
 pub mod domain;
+pub mod email;
 pub mod models;
 pub mod port_saver;
 pub mod routes;

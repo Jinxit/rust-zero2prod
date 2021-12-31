@@ -1,5 +1,6 @@
 use crate::catchers::*;
 use crate::configuration::Settings;
+use crate::email::Email;
 use crate::port_saver;
 use crate::port_saver::Port;
 use crate::routes::*;
@@ -23,7 +24,10 @@ impl NewsletterDbConn {
     }
 }
 
-pub async fn build(settings: &Settings) -> Result<(Rocket<Ignite>, Port), rocket::Error> {
+pub async fn build(
+    settings: &Settings,
+    email_client: Box<dyn Email + Send + Sync>,
+) -> Result<(Rocket<Ignite>, Port), rocket::Error> {
     let (port_saver, port) = port_saver::create_pair();
     let db: Map<_, Value> = map! {
         "url" => settings.database.connection_string().into()
@@ -45,6 +49,7 @@ pub async fn build(settings: &Settings) -> Result<(Rocket<Ignite>, Port), rocket
         .attach(NewsletterDbConn::named_fairing(
             settings.database.database_name.clone(),
         ))
+        .manage(email_client)
         .mount("/", routes![health, subscribe])
         .register("/", catchers![unprocessable_entity_to_bad_request])
         .ignite()
