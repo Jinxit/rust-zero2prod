@@ -12,6 +12,7 @@ pub struct Subscription {
     pub email: String,
     pub name: String,
     pub subscribed_at: DateTime<Utc>,
+    pub status: String,
 }
 
 #[derive(Insertable)]
