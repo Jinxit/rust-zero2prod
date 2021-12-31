@@ -64,6 +64,7 @@ async fn insert_subscriber(
                 email: new_subscriber.email.as_ref(),
                 name: new_subscriber.name.as_ref(),
                 subscribed_at: &Utc::now(),
+                status: "confirmed",
             })
             .execute(c)
     })

@@ -4,5 +4,6 @@ table! {
         email -> Text,
         name -> Text,
         subscribed_at -> Timestamptz,
+        status -> Text,
     }
 }
