@@ -21,4 +21,5 @@ pub struct NewSubscription<'a> {
     pub email: &'a str,
     pub name: &'a str,
     pub subscribed_at: &'a DateTime<Utc>,
+    pub status: &'a str,
 }
