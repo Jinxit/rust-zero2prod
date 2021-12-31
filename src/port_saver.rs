@@ -1,5 +1,6 @@
 use rocket::fairing::Info;
 use rocket::{Orbit, Rocket};
+use std::sync::Mutex;
 use tokio::sync::mpsc;
 
 pub fn create_pair() -> (PortSaver, Port) {
@@ -10,21 +11,26 @@ pub fn create_pair() -> (PortSaver, Port) {
 }
 
 pub struct Port {
-    port: Option<u16>,
-    rx: mpsc::Receiver<u16>,
+    port: Mutex<Option<u16>>,
+    rx: Mutex<mpsc::Receiver<u16>>,
 }
 
 impl Port {
     fn new(rx: mpsc::Receiver<u16>) -> Port {
-        Port { port: None, rx }
+        Port {
+            port: Mutex::new(None),
+            rx: Mutex::new(rx),
+        }
     }
 
-    pub async fn get(&mut self) -> u16 {
-        match self.port {
+    pub async fn get(&self) -> u16 {
+        let mut port_guard = self.port.lock().unwrap();
+        match *port_guard {
             Some(port) => port,
             None => {
-                let port = self.rx.recv().await.unwrap();
-                self.port = Some(port);
+                let mut rx_guard = self.rx.lock().unwrap();
+                let port = rx_guard.recv().await.unwrap();
+                *port_guard = Some(port);
                 port
             }
         }

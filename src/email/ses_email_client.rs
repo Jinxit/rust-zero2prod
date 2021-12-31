@@ -1,7 +1,10 @@
+use crate::configuration::Settings;
 use crate::domain::SubscriberEmail;
 use crate::email::email::Email;
+use aws_config::TimeoutConfig;
 use aws_sdk_sesv2 as ses;
 use aws_sdk_sesv2::model::{Body, Content, Destination, EmailContent, Message};
+use std::time::Duration;
 
 pub struct SesEmailClient {
     ses_client: ses::Client,
@@ -9,7 +12,21 @@ pub struct SesEmailClient {
 }
 
 impl SesEmailClient {
-    pub fn new(ses_client: ses::Client, sender: SubscriberEmail) -> Self {
+    pub async fn new(configuration: &Settings) -> Self {
+        let sender = configuration
+            .email_client
+            .sender()
+            .expect("Invalid sender email address.");
+
+        let timeout = Some(Duration::from_millis(
+            configuration.email_client.timeout_milliseconds,
+        ));
+        let timeout_config = TimeoutConfig::new().with_api_call_timeout(timeout);
+        let shared_config = aws_config::from_env()
+            .timeout_config(timeout_config)
+            .load()
+            .await;
+        let ses_client = ses::Client::new(&shared_config);
         Self { ses_client, sender }
     }
 }
