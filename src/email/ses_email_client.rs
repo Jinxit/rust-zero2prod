@@ -1,6 +1,7 @@
 use crate::configuration::Settings;
 use crate::domain::SubscriberEmail;
 use crate::email::Email;
+use async_trait::async_trait;
 use aws_config::TimeoutConfig;
 use aws_sdk_sesv2 as ses;
 use aws_sdk_sesv2::model::{Body, Content, Destination, EmailContent, Message};

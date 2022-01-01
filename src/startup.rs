@@ -11,6 +11,7 @@ use rocket::figment::{
 };
 use rocket::{Config, Ignite, Rocket};
 use rocket_sync_db_pools::{database, diesel, ConnectionPool};
+use std::sync::Arc;
 
 pub struct Application {
     pub port: Port,
@@ -20,7 +21,7 @@ pub struct Application {
 impl Application {
     pub async fn build(
         settings: &Settings,
-        email_client: Box<dyn Email + Send + Sync>,
+        email_client: Arc<dyn Email>,
     ) -> Result<Self, rocket::Error> {
         let (port_saver, port) = port_saver::create_pair();
         let db: Map<_, Value> = map! {

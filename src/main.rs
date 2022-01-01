@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use zero2prod::configuration::get_configuration;
 use zero2prod::email::SesEmailClient;
 use zero2prod::startup::Application;
@@ -11,7 +12,7 @@ async fn main() -> Result<(), rocket::Error> {
     let configuration = get_configuration().expect("Failed to read configuration.");
     let email_client = SesEmailClient::new(&configuration).await;
 
-    Application::build(&configuration, Box::new(email_client))
+    Application::build(&configuration, Arc::new(email_client))
         .await?
         .server
         .launch()
