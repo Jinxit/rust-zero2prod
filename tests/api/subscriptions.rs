@@ -1,7 +1,8 @@
 use crate::helpers::spawn_app;
+use claim::assert_some;
 use diesel::RunQueryDsl;
 use zero2prod::models::*;
-use zero2prod::schema::subscriptions::dsl::*;
+use zero2prod::schema::subscriptions::dsl::subscriptions;
 
 #[tokio::test]
 async fn subscribe_returns_a_200_for_valid_form_data() {
@@ -92,4 +93,62 @@ async fn subscribe_returns_a_400_when_fields_are_present_but_invalid() {
             description
         )
     }
+}
+
+#[tokio::test]
+async fn subscribe_sends_a_confirmation_email_for_valid_data() {
+    // arrange
+    let app = spawn_app().await;
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+
+    // act
+    app.post_subscriptions(body.into()).await;
+
+    // assert
+    let emails = app.email_client.sent_emails.lock().unwrap();
+    assert_eq!(
+        emails.len(),
+        1,
+        "Expected 1 email, {} were sent",
+        emails.len()
+    );
+    let email = emails.get(0);
+    assert_some!(email);
+    let email = email.unwrap();
+    assert_eq!(email.recipient.as_ref(), "ursula_le_guin@gmail.com");
+}
+
+#[tokio::test]
+async fn subscribe_sends_a_confirmation_email_with_a_link() {
+    // arrange
+    let app = spawn_app().await;
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+
+    // act
+    app.post_subscriptions(body.into()).await;
+
+    // assert
+    let emails = app.email_client.sent_emails.lock().unwrap();
+    assert_eq!(
+        emails.len(),
+        1,
+        "Expected 1 email, {} were sent",
+        emails.len()
+    );
+    let email = emails.get(0);
+    assert_some!(email);
+    let email = email.unwrap();
+
+    let get_link = |s: &str| {
+        let links: Vec<_> = linkify::LinkFinder::new()
+            .links(s)
+            .filter(|l| *l.kind() == linkify::LinkKind::Url)
+            .collect();
+        assert_eq!(links.len(), 1);
+        links[0].as_str().to_owned()
+    };
+
+    let html_link = get_link(&email.html_content);
+    let text_link = get_link(&email.text_content);
+    assert_eq!(html_link, text_link);
 }

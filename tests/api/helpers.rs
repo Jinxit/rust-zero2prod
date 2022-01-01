@@ -1,9 +1,12 @@
+use async_trait::async_trait;
 use diesel::prelude::*;
 use diesel::{Connection, PgConnection};
 use once_cell::sync::Lazy;
+use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 use zero2prod::configuration::{get_configuration, Settings};
-use zero2prod::email::SesEmailClient;
+use zero2prod::domain::SubscriberEmail;
+use zero2prod::email::Email;
 use zero2prod::startup::Application;
 use zero2prod::telemetry::{get_subscriber, init_subscriber};
 
@@ -22,6 +25,7 @@ static TRACING: Lazy<()> = Lazy::new(|| {
 pub struct TestApp {
     pub address: String,
     pub db_connection: PgConnection,
+    pub email_client: Arc<MockEmailClient>,
 }
 
 impl TestApp {
@@ -33,6 +37,43 @@ impl TestApp {
             .send()
             .await
             .expect("Failed to execute request")
+    }
+}
+
+pub struct SentEmail {
+    pub recipient: SubscriberEmail,
+    pub subject: String,
+    pub html_content: String,
+    pub text_content: String,
+}
+
+pub struct MockEmailClient {
+    pub sent_emails: Mutex<Vec<SentEmail>>,
+}
+
+impl MockEmailClient {
+    fn new() -> Self {
+        Self {
+            sent_emails: Mutex::new(Vec::new()),
+        }
+    }
+}
+
+#[async_trait]
+impl Email for MockEmailClient {
+    async fn send_email(
+        &self,
+        recipient: SubscriberEmail,
+        subject: &str,
+        html_content: &str,
+        text_content: &str,
+    ) -> anyhow::Result<()> {
+        Ok(self.sent_emails.lock().unwrap().push(SentEmail {
+            recipient,
+            subject: subject.to_string(),
+            html_content: html_content.to_string(),
+            text_content: text_content.to_string(),
+        }))
     }
 }
 
@@ -49,15 +90,16 @@ pub async fn spawn_app() -> TestApp {
 
     let db_connection = setup_database(&configuration);
 
-    let email_client = SesEmailClient::new(&configuration).await;
+    let email_client = Arc::new(MockEmailClient::new());
 
-    let app = Application::build(&configuration, Box::new(email_client))
+    let app = Application::build(&configuration, email_client.clone())
         .await
         .unwrap();
     let _ = tokio::spawn(app.server.launch());
     TestApp {
         address: format!("http://127.0.0.1:{}", app.port.get().await),
         db_connection,
+        email_client,
     }
 }
 

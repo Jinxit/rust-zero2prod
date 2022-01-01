@@ -1,11 +1,14 @@
 use crate::domain::SubscriberName;
 use crate::domain::{NewSubscriber, SubscriberEmail};
+use crate::email::Email;
 use crate::models::NewSubscription;
 use crate::startup::NewsletterDbConn;
 use chrono::Utc;
 use diesel::RunQueryDsl;
 use rocket::form::Form;
 use rocket::http::Status;
+use rocket::State;
+use std::sync::Arc;
 use uuid::Uuid;
 
 #[derive(FromForm)]
@@ -26,7 +29,7 @@ impl TryFrom<FormData> for NewSubscriber {
 
 #[tracing::instrument(
     name = "Adding a new subscriber",
-    skip(form, conn),
+    skip(form, conn, email_client),
     fields(
         request_id = %Uuid::new_v4(),
         subscriber_email = %form.email,
@@ -34,18 +37,49 @@ impl TryFrom<FormData> for NewSubscriber {
     )
 )]
 #[post("/subscriptions", data = "<form>")]
-pub async fn subscribe(form: Form<FormData>, conn: NewsletterDbConn) -> Result<(), Status> {
+pub async fn subscribe(
+    form: Form<FormData>,
+    conn: NewsletterDbConn,
+    email_client: &State<Arc<dyn Email>>,
+) -> Result<(), Status> {
     let new_subscriber = match form.into_inner().try_into() {
         Ok(subscriber) => subscriber,
         Err(_) => return Err(Status::BadRequest),
     };
-    match insert_subscriber(new_subscriber, conn).await {
-        Ok(_) => Ok(()),
-        Err(e) => {
-            tracing::error!("Failed to execute query: {:?}", e);
-            Err(Status::InternalServerError)
-        }
+    if insert_subscriber(&new_subscriber, conn).await.is_err() {
+        return Err(Status::InternalServerError);
     }
+
+    if send_confirmation_email(email_client, new_subscriber)
+        .await
+        .is_err()
+    {
+        return Err(Status::InternalServerError);
+    }
+    Ok(())
+}
+
+#[tracing::instrument(
+    name = "Send a confirmation email to a new subscriber",
+    skip(email_client, new_subscriber)
+)]
+async fn send_confirmation_email(
+    email_client: &State<Arc<dyn Email>>,
+    new_subscriber: NewSubscriber,
+) -> anyhow::Result<()> {
+    let confirmation_link = "https://my-api.com/subscriptions/confirm";
+    let html_body = &format!(
+        "Welcome to our newsletter!<br />\
+                Click <a href=\"{}\">here</a> to confirm your subscription.",
+        confirmation_link
+    );
+    let plain_body = &format!(
+        "Welcome to our newsletter!\nVisit {} to confirm your subscription.",
+        confirmation_link
+    );
+    email_client
+        .send_email(new_subscriber.email, "Welcome!", html_body, plain_body)
+        .await
 }
 
 #[tracing::instrument(
@@ -53,16 +87,18 @@ pub async fn subscribe(form: Form<FormData>, conn: NewsletterDbConn) -> Result<(
     skip(new_subscriber, conn)
 )]
 async fn insert_subscriber(
-    new_subscriber: NewSubscriber,
+    new_subscriber: &NewSubscriber,
     conn: NewsletterDbConn,
 ) -> diesel::QueryResult<usize> {
     use crate::schema::subscriptions;
+    let email = new_subscriber.email.as_ref().to_string();
+    let name = new_subscriber.name.as_ref().to_string();
     conn.run(move |c| {
         diesel::insert_into(subscriptions::table)
             .values(NewSubscription {
                 id: &Uuid::new_v4(),
-                email: new_subscriber.email.as_ref(),
-                name: new_subscriber.name.as_ref(),
+                email: &email,
+                name: &name,
                 subscribed_at: &Utc::now(),
                 status: "confirmed",
             })
