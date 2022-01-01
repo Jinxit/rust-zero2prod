@@ -45,13 +45,16 @@ impl Application {
                 settings.database.database_name.clone(),
             ))
             .manage(email_client)
-            .mount("/", routes![health, subscribe])
+            .manage(ApplicationBaseUrl(settings.application.base_url.clone()))
+            .mount("/", routes![health, subscribe, confirm])
             .register("/", catchers![unprocessable_entity_to_bad_request])
             .ignite()
             .await
             .map(|server| Application { port, server })
     }
 }
+
+pub struct ApplicationBaseUrl(pub String);
 
 #[database("newsletter")]
 pub struct NewsletterDbConn(diesel::PgConnection);

@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use diesel::prelude::*;
 use diesel::{Connection, PgConnection};
 use once_cell::sync::Lazy;
+use reqwest::Url;
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 use zero2prod::configuration::{get_configuration, Settings};
@@ -23,9 +24,15 @@ static TRACING: Lazy<()> = Lazy::new(|| {
 });
 
 pub struct TestApp {
+    pub port: u16,
     pub address: String,
     pub db_connection: PgConnection,
     pub email_client: Arc<MockEmailClient>,
+}
+
+pub struct ConfirmationLinks {
+    pub html: reqwest::Url,
+    pub plain_text: reqwest::Url,
 }
 
 impl TestApp {
@@ -37,6 +44,26 @@ impl TestApp {
             .send()
             .await
             .expect("Failed to execute request")
+    }
+
+    pub fn get_confirmation_links(&self, email: &SentEmail) -> ConfirmationLinks {
+        let get_link = |s: &str| {
+            let links: Vec<_> = linkify::LinkFinder::new()
+                .links(s)
+                .filter(|l| *l.kind() == linkify::LinkKind::Url)
+                .collect();
+            assert_eq!(links.len(), 1);
+            let raw_link = links[0].as_str().to_owned();
+
+            let mut confirmation_link = Url::parse(&raw_link).unwrap();
+            assert_eq!(confirmation_link.host_str().unwrap(), "127.0.0.1");
+            confirmation_link.set_port(Some(self.port)).unwrap();
+            confirmation_link
+        };
+
+        let html = get_link(&email.html_content);
+        let plain_text = get_link(&email.text_content);
+        ConfirmationLinks { html, plain_text }
     }
 }
 
@@ -96,8 +123,10 @@ pub async fn spawn_app() -> TestApp {
         .await
         .unwrap();
     let _ = tokio::spawn(app.server.launch());
+    let port = app.port.get().await;
     TestApp {
-        address: format!("http://127.0.0.1:{}", app.port.get().await),
+        port,
+        address: format!("http://127.0.0.1:{}", port),
         db_connection,
         email_client,
     }
