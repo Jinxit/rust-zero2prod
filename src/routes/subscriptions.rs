@@ -1,10 +1,13 @@
 use crate::domain::SubscriberName;
 use crate::domain::{NewSubscriber, SubscriberEmail};
 use crate::email::Email;
-use crate::models::NewSubscription;
+use crate::models::{NewSubscription, NewSubscriptionToken};
+use crate::schema::subscription_tokens;
 use crate::startup::{ApplicationBaseUrl, NewsletterDbConn};
 use chrono::Utc;
 use diesel::RunQueryDsl;
+use rand::distributions::Alphanumeric;
+use rand::{thread_rng, Rng};
 use rocket::form::Form;
 use rocket::http::Status;
 use rocket::State;
@@ -48,17 +51,55 @@ pub async fn subscribe(
         Ok(subscriber) => subscriber,
         Err(_) => return Err(Status::BadRequest),
     };
-    if insert_subscriber(&new_subscriber, conn).await.is_err() {
-        return Err(Status::InternalServerError);
-    }
-
-    if send_confirmation_email(email_client.borrow(), new_subscriber, &base_url.inner().0)
+    let subscriber_id = match insert_subscriber(&new_subscriber, &conn).await {
+        Ok(subscriber_id) => subscriber_id,
+        Err(_) => return Err(Status::InternalServerError),
+    };
+    let subscription_token = generate_subscription_token();
+    if store_token(&conn, subscriber_id, subscription_token.clone())
         .await
         .is_err()
     {
         return Err(Status::InternalServerError);
     }
+
+    if send_confirmation_email(
+        email_client.borrow(),
+        new_subscriber,
+        &base_url.inner().0,
+        &subscription_token,
+    )
+    .await
+    .is_err()
+    {
+        return Err(Status::InternalServerError);
+    }
     Ok(())
+}
+
+#[tracing::instrument(
+    name = "Store subscription token in the database",
+    skip(subscription_token, conn)
+)]
+pub async fn store_token(
+    conn: &NewsletterDbConn,
+    subscriber_id: Uuid,
+    subscription_token: String,
+) -> Result<(), diesel::result::Error> {
+    conn.run(move |c| {
+        diesel::insert_into(subscription_tokens::table)
+            .values(NewSubscriptionToken {
+                subscription_token: &subscription_token,
+                subscriber_id: &subscriber_id,
+            })
+            .execute(c)
+            .map_err(|e| {
+                tracing::error!("Failed to execute query: {:?}", e);
+                e
+            })
+            .map(|_| ())
+    })
+    .await
 }
 
 #[tracing::instrument(
@@ -69,10 +110,11 @@ async fn send_confirmation_email(
     email_client: &Arc<dyn Email>,
     new_subscriber: NewSubscriber,
     base_url: &str,
+    subscription_token: &str,
 ) -> anyhow::Result<()> {
     let confirmation_link = format!(
-        "{}/subscriptions/confirm?subscription_token=mytoken",
-        base_url
+        "{}/subscriptions/confirm?subscription_token={}",
+        base_url, subscription_token
     );
     let html_body = &format!(
         "Welcome to our newsletter!<br />\
@@ -94,21 +136,35 @@ async fn send_confirmation_email(
 )]
 async fn insert_subscriber(
     new_subscriber: &NewSubscriber,
-    conn: NewsletterDbConn,
-) -> diesel::QueryResult<usize> {
+    conn: &NewsletterDbConn,
+) -> Result<Uuid, diesel::result::Error> {
     use crate::schema::subscriptions;
     let email = new_subscriber.email.as_ref().to_string();
     let name = new_subscriber.name.as_ref().to_string();
     conn.run(move |c| {
+        let subscriber_id = Uuid::new_v4();
         diesel::insert_into(subscriptions::table)
             .values(NewSubscription {
-                id: &Uuid::new_v4(),
+                id: &subscriber_id,
                 email: &email,
                 name: &name,
                 subscribed_at: &Utc::now(),
                 status: "pending_confirmation",
             })
             .execute(c)
+            .map_err(|e| {
+                tracing::error!("Failed to execute query: {:?}", e);
+                e
+            })
+            .map(|_| subscriber_id)
     })
     .await
+}
+
+fn generate_subscription_token() -> String {
+    let mut rng = thread_rng();
+    std::iter::repeat_with(|| rng.sample(Alphanumeric))
+        .map(char::from)
+        .take(25)
+        .collect()
 }
