@@ -5,7 +5,7 @@ use crate::models::{NewSubscription, NewSubscriptionToken};
 use crate::schema::subscription_tokens;
 use crate::startup::{ApplicationBaseUrl, NewsletterDbConn};
 use chrono::Utc;
-use diesel::{Connection, PgConnection, RunQueryDsl};
+use diesel::{PgConnection, RunQueryDsl};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use rocket::form::Form;
@@ -52,18 +52,14 @@ pub async fn subscribe(
         Err(_) => return Err(Status::BadRequest),
     };
     let (subscription_token, new_subscriber) = conn
-        .run(move |conn| {
-            conn.transaction(|| {
-                let subscription_token = generate_subscription_token();
-                insert_subscriber(&new_subscriber, &conn)
-                    .and_then(|subscriber_id| {
-                        store_token(&conn, &subscriber_id, &subscription_token)
-                    })
-                    .map(|_| (subscription_token, new_subscriber))
-            })
-            .map_err(|_| Status::InternalServerError)
+        .run_transaction::<_, diesel::result::Error, _>(move |conn| {
+            let subscriber_id = insert_subscriber(&new_subscriber, &conn)?;
+            let subscription_token = generate_subscription_token();
+            store_token(&conn, &subscriber_id, &subscription_token)?;
+            Ok((subscription_token, new_subscriber))
         })
-        .await?;
+        .await
+        .map_err(|_| Status::InternalServerError)?;
 
     if send_confirmation_email(
         email_client.borrow(),

@@ -1,9 +1,11 @@
 use crate::catchers::*;
 use crate::configuration::Settings;
+use crate::diesel::Connection;
 use crate::email::Email;
 use crate::port_saver;
 use crate::port_saver::Port;
 use crate::routes::*;
+use diesel::PgConnection;
 use rocket::fairing::Fairing;
 use rocket::figment::{
     util::map,
@@ -65,5 +67,15 @@ impl NewsletterDbConn {
         let database_name = Box::leak(Box::new(database_name));
 
         <ConnectionPool<Self, diesel::PgConnection>>::fairing(pool_name, database_name)
+    }
+
+    pub async fn run_transaction<T, E, F>(&self, f: F) -> Result<T, E>
+    where
+        T: Send + 'static,
+        E: From<diesel::result::Error> + Send + 'static,
+        F: FnOnce(&diesel::PgConnection) -> Result<T, E> + Send + 'static,
+    {
+        self.run(move |c: &mut PgConnection| c.transaction(|| f(&c)))
+            .await
     }
 }
