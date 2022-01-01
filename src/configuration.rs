@@ -21,6 +21,7 @@ pub struct ApplicationSettings {
     #[serde(deserialize_with = "deserialize_option_number_from_string")]
     pub port: Option<u16>,
     pub host: IpAddr,
+    pub base_url: String,
 }
 
 #[derive(serde::Deserialize)]

@@ -2,12 +2,13 @@ use crate::domain::SubscriberName;
 use crate::domain::{NewSubscriber, SubscriberEmail};
 use crate::email::Email;
 use crate::models::NewSubscription;
-use crate::startup::NewsletterDbConn;
+use crate::startup::{ApplicationBaseUrl, NewsletterDbConn};
 use chrono::Utc;
 use diesel::RunQueryDsl;
 use rocket::form::Form;
 use rocket::http::Status;
 use rocket::State;
+use std::borrow::Borrow;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -29,7 +30,7 @@ impl TryFrom<FormData> for NewSubscriber {
 
 #[tracing::instrument(
     name = "Adding a new subscriber",
-    skip(form, conn, email_client),
+    skip(form, conn, email_client, base_url),
     fields(
         request_id = %Uuid::new_v4(),
         subscriber_email = %form.email,
@@ -41,6 +42,7 @@ pub async fn subscribe(
     form: Form<FormData>,
     conn: NewsletterDbConn,
     email_client: &State<Arc<dyn Email>>,
+    base_url: &State<ApplicationBaseUrl>,
 ) -> Result<(), Status> {
     let new_subscriber = match form.into_inner().try_into() {
         Ok(subscriber) => subscriber,
@@ -50,7 +52,7 @@ pub async fn subscribe(
         return Err(Status::InternalServerError);
     }
 
-    if send_confirmation_email(email_client, new_subscriber)
+    if send_confirmation_email(email_client.borrow(), new_subscriber, &base_url.inner().0)
         .await
         .is_err()
     {
@@ -61,13 +63,17 @@ pub async fn subscribe(
 
 #[tracing::instrument(
     name = "Send a confirmation email to a new subscriber",
-    skip(email_client, new_subscriber)
+    skip(email_client, new_subscriber, base_url)
 )]
 async fn send_confirmation_email(
-    email_client: &State<Arc<dyn Email>>,
+    email_client: &Arc<dyn Email>,
     new_subscriber: NewSubscriber,
+    base_url: &str,
 ) -> anyhow::Result<()> {
-    let confirmation_link = "https://my-api.com/subscriptions/confirm";
+    let confirmation_link = format!(
+        "{}/subscriptions/confirm?subscription_token=mytoken",
+        base_url
+    );
     let html_body = &format!(
         "Welcome to our newsletter!<br />\
                 Click <a href=\"{}\">here</a> to confirm your subscription.",
@@ -100,7 +106,7 @@ async fn insert_subscriber(
                 email: &email,
                 name: &name,
                 subscribed_at: &Utc::now(),
-                status: "confirmed",
+                status: "pending_confirmation",
             })
             .execute(c)
     })
