@@ -53,9 +53,9 @@ pub async fn subscribe(
     };
     let (subscription_token, new_subscriber) = conn
         .run_transaction::<_, diesel::result::Error, _>(move |conn| {
-            let subscriber_id = insert_subscriber(&new_subscriber, &conn)?;
+            let subscriber_id = insert_subscriber(&new_subscriber, conn)?;
             let subscription_token = generate_subscription_token();
-            store_token(&conn, &subscriber_id, &subscription_token)?;
+            store_token(conn, &subscriber_id, &subscription_token)?;
             Ok((subscription_token, new_subscriber))
         })
         .await

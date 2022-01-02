@@ -75,7 +75,7 @@ impl NewsletterDbConn {
         E: From<diesel::result::Error> + Send + 'static,
         F: FnOnce(&diesel::PgConnection) -> Result<T, E> + Send + 'static,
     {
-        self.run(move |c: &mut PgConnection| c.transaction(|| f(&c)))
+        self.run(move |c: &mut PgConnection| c.transaction(|| f(c)))
             .await
     }
 }

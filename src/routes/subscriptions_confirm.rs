@@ -19,13 +19,10 @@ pub async fn confirm(
         Err(_) => return Err(Status::InternalServerError),
     };
     match id {
-        None => return Err(Status::Unauthorized),
-        Some(subscriber_id) => {
-            if confirm_subscriber(&conn, subscriber_id).await.is_err() {
-                return Err(Status::InternalServerError);
-            }
-            Ok(())
-        }
+        None => Err(Status::Unauthorized),
+        Some(subscriber_id) => confirm_subscriber(&conn, subscriber_id)
+            .await
+            .map_err(|_| Status::InternalServerError),
     }
 }
 
