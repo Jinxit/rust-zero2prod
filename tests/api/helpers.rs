@@ -94,7 +94,7 @@ impl Email for MockEmailClient {
         subject: &str,
         html_content: &str,
         text_content: &str,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), anyhow::Error> {
         Ok(self.sent_emails.lock().unwrap().push(SentEmail {
             recipient,
             subject: subject.to_string(),

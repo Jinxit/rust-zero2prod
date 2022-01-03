@@ -155,3 +155,21 @@ async fn subscribe_sends_a_confirmation_email_with_a_link() {
     let confirmation_links = app.get_confirmation_links(&email);
     assert_eq!(confirmation_links.html, confirmation_links.plain_text);
 }
+
+#[tokio::test]
+async fn subscribe_fails_if_there_is_a_fatal_database_error() {
+    // arrange
+    let app = spawn_app().await;
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+
+    // sabotage!
+    diesel::sql_query("ALTER TABLE subscriptions DROP COLUMN email;")
+        .execute(&app.db_connection)
+        .unwrap();
+
+    // act
+    let response = app.post_subscriptions(body.into()).await;
+
+    // assert
+    assert_eq!(response.status().as_u16(), 500);
+}

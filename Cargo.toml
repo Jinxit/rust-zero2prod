@@ -31,6 +31,7 @@ rocket_sync_db_pools = { version = "0.1.0-rc.1", features = ["diesel_postgres_po
 serde = "1.0.132"
 serde-aux = "3.0.1"
 tokio = "1.14.0"
+thiserror = "1.0.30"
 tracing = { version = "0.1.29", features = ["log"] }
 tracing-bunyan-formatter = "0.3.1"
 tracing-log = "0.1.2"

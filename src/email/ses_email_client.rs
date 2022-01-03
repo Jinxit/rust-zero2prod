@@ -40,7 +40,7 @@ impl Email for SesEmailClient {
         subject: &str,
         html_content: &str,
         text_content: &str,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), anyhow::Error> {
         let html_content = Content::builder()
             .data(html_content)
             .charset("UTF-8")
