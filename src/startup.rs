@@ -79,7 +79,7 @@ impl NewsletterDbConn {
         self.run(move |c: &mut PgConnection| {
             let mut closure_error: Option<E> = None;
             c.transaction(|| {
-                f(&c).map_err(|e| {
+                f(c).map_err(|e| {
                     closure_error = Some(e);
                     diesel::result::Error::RollbackTransaction
                 })
