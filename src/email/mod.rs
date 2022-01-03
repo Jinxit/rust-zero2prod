@@ -12,5 +12,5 @@ pub trait Email: Send + Sync {
         subject: &str,
         html_content: &str,
         text_content: &str,
-    ) -> anyhow::Result<()>;
+    ) -> Result<(), anyhow::Error>;
 }

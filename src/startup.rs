@@ -69,13 +69,23 @@ impl NewsletterDbConn {
         <ConnectionPool<Self, diesel::PgConnection>>::fairing(pool_name, database_name)
     }
 
-    pub async fn run_transaction<T, E, F>(&self, f: F) -> Result<T, E>
+    pub async fn run_transaction<T, E, F, G>(&self, f: F, error_mapper: G) -> Result<T, E>
     where
         T: Send + 'static,
-        E: From<diesel::result::Error> + Send + 'static,
+        E: Send + 'static,
         F: FnOnce(&diesel::PgConnection) -> Result<T, E> + Send + 'static,
+        G: FnOnce(diesel::result::Error) -> E + Send + 'static,
     {
-        self.run(move |c: &mut PgConnection| c.transaction(|| f(c)))
-            .await
+        self.run(move |c: &mut PgConnection| {
+            let mut closure_error: Option<E> = None;
+            c.transaction(|| {
+                f(&c).map_err(|e| {
+                    closure_error = Some(e);
+                    diesel::result::Error::RollbackTransaction
+                })
+            })
+            .map_err(|diesel_error| closure_error.unwrap_or_else(|| error_mapper(diesel_error)))
+        })
+        .await
     }
 }

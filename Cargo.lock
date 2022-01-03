@@ -2717,6 +2717,7 @@ dependencies = [
  "rocket_sync_db_pools",
  "serde 1.0.132",
  "serde-aux",
+ "thiserror",
  "tokio",
  "tracing",
  "tracing-bunyan-formatter",
