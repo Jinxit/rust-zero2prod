@@ -2,7 +2,7 @@ use crate::domain::SubscriberName;
 use crate::domain::{NewSubscriber, SubscriberEmail};
 use crate::email::Email;
 use crate::models::{NewSubscription, NewSubscriptionToken};
-use crate::schema::subscription_tokens;
+use crate::routes::error_chain_fmt;
 use crate::startup::{ApplicationBaseUrl, NewsletterDbConn};
 use anyhow::Context;
 use chrono::Utc;
@@ -119,14 +119,14 @@ pub fn store_token(
     subscriber_id: &Uuid,
     subscription_token: &str,
 ) -> Result<(), StoreTokenError> {
-    diesel::insert_into(subscription_tokens::table)
+    use crate::schema::subscription_tokens::dsl::subscription_tokens;
+    diesel::insert_into(subscription_tokens)
         .values(NewSubscriptionToken {
             subscription_token,
             subscriber_id,
         })
         .execute(conn)
-        .map_err(StoreTokenError)
-        .map(|_| ())?;
+        .map_err(StoreTokenError)?;
     Ok(())
 }
 
@@ -154,19 +154,6 @@ impl std::fmt::Debug for StoreTokenError {
     }
 }
 
-fn error_chain_fmt(
-    e: &impl std::error::Error,
-    f: &mut std::fmt::Formatter<'_>,
-) -> std::fmt::Result {
-    writeln!(f, "{}\n", e)?;
-    let mut current = e.source();
-    while let Some(cause) = current {
-        writeln!(f, "Caused by:\n\t{}", cause)?;
-        current = cause.source();
-    }
-    Ok(())
-}
-
 #[tracing::instrument(
     name = "Send a confirmation email to a new subscriber",
     skip(email_client, new_subscriber, base_url)
@@ -191,7 +178,7 @@ async fn send_confirmation_email(
         confirmation_link
     );
     email_client
-        .send_email(new_subscriber.email, "Welcome!", html_body, plain_body)
+        .send_email(&new_subscriber.email, "Welcome!", html_body, plain_body)
         .await
 }
 
