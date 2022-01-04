@@ -46,6 +46,15 @@ impl TestApp {
             .expect("Failed to execute request")
     }
 
+    pub async fn post_newsletters(&self, body: serde_json::Value) -> reqwest::Response {
+        reqwest::Client::new()
+            .post(&format!("{}/newsletters", &self.address))
+            .json(&body)
+            .send()
+            .await
+            .expect("Failed to execute request.")
+    }
+
     pub fn get_confirmation_links(&self, email: &SentEmail) -> ConfirmationLinks {
         let get_link = |s: &str| {
             let links: Vec<_> = linkify::LinkFinder::new()
@@ -68,7 +77,7 @@ impl TestApp {
 }
 
 pub struct SentEmail {
-    pub recipient: SubscriberEmail,
+    pub recipient: String,
     pub subject: String,
     pub html_content: String,
     pub text_content: String,
@@ -90,13 +99,13 @@ impl MockEmailClient {
 impl Email for MockEmailClient {
     async fn send_email(
         &self,
-        recipient: SubscriberEmail,
+        recipient: &SubscriberEmail,
         subject: &str,
         html_content: &str,
         text_content: &str,
     ) -> Result<(), anyhow::Error> {
         Ok(self.sent_emails.lock().unwrap().push(SentEmail {
-            recipient,
+            recipient: recipient.as_ref().to_string(),
             subject: subject.to_string(),
             html_content: html_content.to_string(),
             text_content: text_content.to_string(),

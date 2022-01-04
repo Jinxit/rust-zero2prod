@@ -8,7 +8,7 @@ pub use ses_email_client::SesEmailClient;
 pub trait Email: Send + Sync {
     async fn send_email(
         &self,
-        recipient: SubscriberEmail,
+        recipient: &SubscriberEmail,
         subject: &str,
         html_content: &str,
         text_content: &str,

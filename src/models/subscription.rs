@@ -2,10 +2,6 @@ use crate::schema::subscriptions;
 use chrono::offset::Utc;
 use chrono::DateTime;
 
-// TODO: can these be the same thing?
-//       can Subscription have a lifetime?
-//       or would that mean NewSubscription needs ownership?
-
 #[derive(Queryable)]
 pub struct Subscription {
     pub id: uuid::Uuid,

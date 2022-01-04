@@ -128,7 +128,7 @@ async fn subscribe_sends_a_confirmation_email_for_valid_data() {
     let email = emails.get(0);
     assert_some!(email);
     let email = email.unwrap();
-    assert_eq!(email.recipient.as_ref(), "ursula_le_guin@gmail.com");
+    assert_eq!(email.recipient, "ursula_le_guin@gmail.com");
 }
 
 #[tokio::test]
