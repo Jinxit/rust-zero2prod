@@ -1837,6 +1837,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "secrecy"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9bd1c54ea06cfd2f6b63219704de0b9b4f72dcc2b8fdef820be6cd799780e91e"
+dependencies = [
+ "zeroize",
+]
+
+[[package]]
 name = "security-framework"
 version = "2.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2702,6 +2711,7 @@ dependencies = [
  "async-trait",
  "aws-config",
  "aws-sdk-sesv2",
+ "base64",
  "chrono",
  "claim",
  "config",
@@ -2716,6 +2726,7 @@ dependencies = [
  "reqwest",
  "rocket",
  "rocket_sync_db_pools",
+ "secrecy",
  "serde 1.0.132",
  "serde-aux",
  "serde_json",
