@@ -49,7 +49,13 @@ impl Application {
             .manage(email_client)
             .manage(ApplicationBaseUrl(settings.application.base_url.clone()))
             .mount("/", routes![health, subscribe, confirm, publish_newsletter])
-            .register("/", catchers![unprocessable_entity_to_bad_request])
+            .register(
+                "/",
+                catchers![
+                    unprocessable_entity_to_bad_request,
+                    unauthorized_request_credentials
+                ],
+            )
             .ignite()
             .await
             .map(|server| Application { port, server })

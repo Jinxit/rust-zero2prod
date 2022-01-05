@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context};
 use rocket::http::Status;
-use rocket::outcome::Outcome::{Failure, Success};
+use rocket::outcome::IntoOutcome;
 use rocket::request::{FromRequest, Outcome};
 use rocket::Request;
 use secrecy::Secret;
@@ -15,10 +15,7 @@ impl<'r> FromRequest<'r> for BasicAuth {
     type Error = anyhow::Error;
 
     async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
-        match from_request_result(request) {
-            Ok(auth) => Success(auth),
-            Err(e) => Failure((Status::Unauthorized, e)),
-        }
+        from_request_result(request).into_outcome(Status::Unauthorized)
     }
 }
 
