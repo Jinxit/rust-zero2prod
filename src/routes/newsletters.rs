@@ -1,5 +1,6 @@
 use crate::domain::SubscriberEmail;
 use crate::email::Email;
+use crate::guards::BasicAuth;
 use crate::routes::error_chain_fmt;
 use crate::startup::NewsletterDbConn;
 use anyhow::Context;
@@ -26,6 +27,7 @@ pub async fn publish_newsletter(
     body: rocket::serde::json::Json<BodyData>,
     conn: NewsletterDbConn,
     email_client: &State<Arc<dyn Email>>,
+    auth: BasicAuth,
 ) -> Result<(), PublishError> {
     let subscribers = conn
         .run(|conn: &mut PgConnection| get_confirmed_subscribers(conn))
