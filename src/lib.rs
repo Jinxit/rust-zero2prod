@@ -13,3 +13,4 @@ pub mod routes;
 pub mod schema;
 pub mod startup;
 pub mod telemetry;
+pub mod guards;
