@@ -3,12 +3,13 @@ use diesel::prelude::*;
 use diesel::{Connection, PgConnection};
 use once_cell::sync::Lazy;
 use reqwest::Url;
+use sha3::Digest;
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 use zero2prod::configuration::{get_configuration, Settings};
 use zero2prod::domain::SubscriberEmail;
 use zero2prod::email::Email;
-use zero2prod::models::{NewUser, User};
+use zero2prod::models::NewUser;
 use zero2prod::startup::Application;
 use zero2prod::telemetry::{get_subscriber, init_subscriber};
 
@@ -29,11 +30,7 @@ pub struct TestApp {
     pub address: String,
     pub db_connection: PgConnection,
     pub email_client: Arc<MockEmailClient>,
-}
-
-pub struct ConfirmationLinks {
-    pub html: reqwest::Url,
-    pub plain_text: reqwest::Url,
+    pub test_user: TestUser,
 }
 
 impl TestApp {
@@ -48,10 +45,9 @@ impl TestApp {
     }
 
     pub async fn post_newsletters(&self, body: serde_json::Value) -> reqwest::Response {
-        let user = self.test_user();
         reqwest::Client::new()
             .post(&format!("{}/newsletters", &self.address))
-            .basic_auth(user.username, Some(user.password))
+            .basic_auth(&self.test_user.username, Some(&self.test_user.password))
             .json(&body)
             .send()
             .await
@@ -77,13 +73,40 @@ impl TestApp {
         let plain_text = get_link(&email.text_content);
         ConfirmationLinks { html, plain_text }
     }
+}
 
-    pub fn test_user(&self) -> User {
+pub struct ConfirmationLinks {
+    pub html: reqwest::Url,
+    pub plain_text: reqwest::Url,
+}
+
+pub struct TestUser {
+    pub user_id: Uuid,
+    pub username: String,
+    pub password: String,
+}
+
+impl TestUser {
+    pub fn generate() -> Self {
+        Self {
+            user_id: Uuid::new_v4(),
+            username: Uuid::new_v4().to_string(),
+            password: Uuid::new_v4().to_string(),
+        }
+    }
+
+    fn store(&self, conn: &PgConnection) {
         use zero2prod::schema::users;
-        users::table
-            .select((users::username, users::password))
-            .first::<User>(&self.db_connection)
-            .expect("Failed to fetch test user.")
+        let password_hash = sha3::Sha3_256::digest(self.password.as_bytes());
+        let password_hash = format!("{:x}", password_hash);
+        diesel::insert_into(users::table)
+            .values(NewUser {
+                user_id: &self.user_id,
+                username: &self.username,
+                password_hash: &password_hash,
+            })
+            .execute(conn)
+            .expect("Failed to store test user.");
     }
 }
 
@@ -145,27 +168,17 @@ pub async fn spawn_app() -> TestApp {
     let _ = tokio::spawn(app.server.launch());
     let port = app.port.get().await;
 
-    add_test_user(&db_connection);
+    let test_user = TestUser::generate();
+
+    test_user.store(&db_connection);
 
     TestApp {
         port,
         address: format!("http://127.0.0.1:{}", port),
         db_connection,
         email_client,
+        test_user,
     }
-}
-
-fn add_test_user(conn: &PgConnection) {
-    use zero2prod::schema::users;
-
-    diesel::insert_into(users::table)
-        .values(NewUser {
-            user_id: &Uuid::new_v4(),
-            username: &Uuid::new_v4().to_string(),
-            password: &Uuid::new_v4().to_string(),
-        })
-        .execute(conn)
-        .expect("Failed to create test users");
 }
 
 fn setup_database(configuration: &Settings) -> PgConnection {

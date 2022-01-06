@@ -3,7 +3,7 @@ use crate::schema::users;
 #[derive(Queryable)]
 pub struct User {
     pub username: String,
-    pub password: String,
+    pub password_hash: String,
 }
 
 #[derive(Insertable)]
@@ -11,5 +11,5 @@ pub struct User {
 pub struct NewUser<'a> {
     pub user_id: &'a uuid::Uuid,
     pub username: &'a str,
-    pub password: &'a str,
+    pub password_hash: &'a str,
 }
