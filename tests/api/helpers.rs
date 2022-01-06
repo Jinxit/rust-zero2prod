@@ -1,9 +1,10 @@
+use argon2::password_hash::SaltString;
+use argon2::{Argon2, PasswordHasher};
 use async_trait::async_trait;
 use diesel::prelude::*;
 use diesel::{Connection, PgConnection};
 use once_cell::sync::Lazy;
 use reqwest::Url;
-use sha3::Digest;
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 use zero2prod::configuration::{get_configuration, Settings};
@@ -97,8 +98,12 @@ impl TestUser {
 
     fn store(&self, conn: &PgConnection) {
         use zero2prod::schema::users;
-        let password_hash = sha3::Sha3_256::digest(self.password.as_bytes());
-        let password_hash = format!("{:x}", password_hash);
+        let salt = SaltString::generate(&mut rand::thread_rng());
+        let password_hash = Argon2::default()
+            .hash_password(self.password.as_bytes(), &salt)
+            .unwrap()
+            .to_string();
+
         diesel::insert_into(users::table)
             .values(NewUser {
                 user_id: &self.user_id,

@@ -1,14 +1,17 @@
-use crate::guards::BasicAuth;
+use crate::guards::{BasicAuth, OrStatus};
+use crate::models::User;
 use crate::startup::NewsletterDbConn;
-use anyhow::{anyhow, Context};
+use crate::telemetry::spawn_blocking_with_tracing;
+use anyhow::anyhow;
+use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use diesel::OptionalExtension;
 use diesel::{ExpressionMethods, PgConnection, QueryDsl, RunQueryDsl};
 use rocket::http::Status;
-use rocket::outcome::{try_outcome, IntoOutcome};
+use rocket::outcome::try_outcome;
+use rocket::outcome::Outcome::{Failure, Success};
 use rocket::request::{FromRequest, Outcome};
 use rocket::Request;
-use secrecy::ExposeSecret;
-use sha3::Digest;
+use secrecy::{ExposeSecret, Secret};
 use uuid::Uuid;
 
 pub struct AuthenticatedUser {
@@ -29,38 +32,77 @@ impl<'r> FromRequest<'r> for AuthenticatedUser {
         )));
         let basic_auth = try_outcome!(request.guard::<BasicAuth>().await.map_failure(|_| (
             Status::Unauthorized,
-            anyhow!("User has not been authenticated.")
+            anyhow!("User did not supply Basic Auth credentials.")
         )));
 
-        from_request_result(basic_auth, conn)
-            .await
-            .into_outcome(Status::Unauthorized)
+        match validate_credentials(conn, basic_auth).await {
+            Ok(user) => Success(user),
+            Err((status, err)) => Failure((status, err)),
+        }
     }
 }
 
-async fn from_request_result(
-    basic_auth: BasicAuth,
+#[tracing::instrument(name = "Validate credentials", skip(conn, basic_auth))]
+async fn validate_credentials(
     conn: NewsletterDbConn,
-) -> Result<AuthenticatedUser, anyhow::Error> {
-    let password_hash = sha3::Sha3_256::digest(basic_auth.password.expose_secret().as_bytes());
-    let password_hash = format!("{:x}", password_hash);
+    basic_auth: BasicAuth,
+) -> Result<AuthenticatedUser, (Status, anyhow::Error)> {
+    let user: Option<User> = get_stored_credentials(conn, basic_auth.username).await?;
+
+    let user = user.or_status(Status::Unauthorized, "Unknown username.")?;
+    let expected_password_hash = Secret::new(user.password_hash);
+
+    spawn_blocking_with_tracing(move || {
+        verify_password_hash(expected_password_hash, basic_auth.password)
+    })
+    .await
+    .or_status(Status::InternalServerError, "Failed to spawn/join thread.")??;
+
+    Ok(AuthenticatedUser {
+        user_id: user.user_id,
+        username: user.username,
+        _private: (),
+    })
+}
+
+#[tracing::instrument(
+    name = "Verify password hash",
+    skip(expected_password_hash, password_candidate)
+)]
+fn verify_password_hash(
+    expected_password_hash: Secret<String>,
+    password_candidate: Secret<String>,
+) -> Result<(), (Status, anyhow::Error)> {
+    let expected_password_hash = PasswordHash::new(expected_password_hash.expose_secret())
+        .or_status(
+            Status::InternalServerError,
+            "Failed to parse hash in PHC string format.",
+        )?;
+
+    Argon2::default()
+        .verify_password(
+            password_candidate.expose_secret().as_bytes(),
+            &expected_password_hash,
+        )
+        .or_status(Status::Unauthorized, "Invalid password.")
+}
+
+#[tracing::instrument(name = "Get stored credentials", skip(conn, username))]
+async fn get_stored_credentials(
+    conn: NewsletterDbConn,
+    username: String,
+) -> Result<Option<User>, (Status, anyhow::Error)> {
     conn.run(move |conn: &mut PgConnection| {
         use crate::schema::users;
 
-        let user_id = users::table
-            .select(users::user_id)
-            .filter(users::username.eq(&basic_auth.username))
-            .filter(users::password_hash.eq(&password_hash))
-            .first::<Uuid>(conn)
+        users::table
+            .filter(users::username.eq(username))
+            .first::<User>(conn)
             .optional()
-            .context("Failed to perform a query to validate auth credentials.")?
-            .ok_or_else(|| anyhow!("Invalid username or password."))?;
-
-        Ok(AuthenticatedUser {
-            user_id,
-            username: basic_auth.username,
-            _private: (),
-        })
     })
     .await
+    .or_status(
+        Status::InternalServerError,
+        "Failed to perform a query to retrieve stored credentials.",
+    )
 }
