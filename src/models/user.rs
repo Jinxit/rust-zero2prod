@@ -1,7 +1,9 @@
 use crate::schema::users;
+use uuid::Uuid;
 
 #[derive(Queryable)]
 pub struct User {
+    pub user_id: Uuid,
     pub username: String,
     pub password_hash: String,
 }

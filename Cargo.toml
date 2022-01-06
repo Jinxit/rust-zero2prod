@@ -14,6 +14,7 @@ name = "zero2prod"
 
 [dependencies]
 anyhow = "1.0.52"
+argon2 = { version = "0.3.2", features = ["std"] }
 async-trait = "0.1.52"
 aws-config = "0.3.0"
 aws-sdk-sesv2 = "0.3.0"
@@ -32,7 +33,6 @@ rocket_sync_db_pools = { version = "0.1.0-rc.1", features = ["diesel_postgres_po
 secrecy = "0.8.0"
 serde = "1.0.132"
 serde-aux = "3.0.1"
-sha3 = "0.10.0"
 tokio = "1.14.0"
 thiserror = "1.0.30"
 tracing = { version = "0.1.29", features = ["log"] }
