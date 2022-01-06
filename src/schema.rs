@@ -14,3 +14,11 @@ table! {
         subscriber_id -> Uuid,
     }
 }
+
+table! {
+    users (user_id) {
+        user_id -> Uuid,
+        username -> Text,
+        password -> Text,
+    }
+}

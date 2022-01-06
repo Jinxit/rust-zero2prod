@@ -8,6 +8,7 @@ use uuid::Uuid;
 use zero2prod::configuration::{get_configuration, Settings};
 use zero2prod::domain::SubscriberEmail;
 use zero2prod::email::Email;
+use zero2prod::models::{NewUser, User};
 use zero2prod::startup::Application;
 use zero2prod::telemetry::{get_subscriber, init_subscriber};
 
@@ -47,9 +48,10 @@ impl TestApp {
     }
 
     pub async fn post_newsletters(&self, body: serde_json::Value) -> reqwest::Response {
+        let user = self.test_user();
         reqwest::Client::new()
             .post(&format!("{}/newsletters", &self.address))
-            .basic_auth(Uuid::new_v4().to_string(), Some(Uuid::new_v4().to_string()))
+            .basic_auth(user.username, Some(user.password))
             .json(&body)
             .send()
             .await
@@ -74,6 +76,14 @@ impl TestApp {
         let html = get_link(&email.html_content);
         let plain_text = get_link(&email.text_content);
         ConfirmationLinks { html, plain_text }
+    }
+
+    pub fn test_user(&self) -> User {
+        use zero2prod::schema::users;
+        users::table
+            .select((users::username, users::password))
+            .first::<User>(&self.db_connection)
+            .expect("Failed to fetch test user.")
     }
 }
 
@@ -134,12 +144,28 @@ pub async fn spawn_app() -> TestApp {
         .unwrap();
     let _ = tokio::spawn(app.server.launch());
     let port = app.port.get().await;
+
+    add_test_user(&db_connection);
+
     TestApp {
         port,
         address: format!("http://127.0.0.1:{}", port),
         db_connection,
         email_client,
     }
+}
+
+fn add_test_user(conn: &PgConnection) {
+    use zero2prod::schema::users;
+
+    diesel::insert_into(users::table)
+        .values(NewUser {
+            user_id: &Uuid::new_v4(),
+            username: &Uuid::new_v4().to_string(),
+            password: &Uuid::new_v4().to_string(),
+        })
+        .execute(conn)
+        .expect("Failed to create test users");
 }
 
 fn setup_database(configuration: &Settings) -> PgConnection {
