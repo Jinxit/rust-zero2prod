@@ -6,8 +6,8 @@ use rocket::Request;
 use secrecy::Secret;
 
 pub struct BasicAuth {
-    username: String,
-    password: Secret<String>,
+    pub username: String,
+    pub password: Secret<String>,
 }
 
 #[async_trait]
