@@ -8,6 +8,7 @@ use rocket::outcome::{try_outcome, IntoOutcome};
 use rocket::request::{FromRequest, Outcome};
 use rocket::Request;
 use secrecy::ExposeSecret;
+use sha3::Digest;
 use uuid::Uuid;
 
 pub struct AuthenticatedUser {
@@ -41,13 +42,15 @@ async fn from_request_result(
     basic_auth: BasicAuth,
     conn: NewsletterDbConn,
 ) -> Result<AuthenticatedUser, anyhow::Error> {
+    let password_hash = sha3::Sha3_256::digest(basic_auth.password.expose_secret().as_bytes());
+    let password_hash = format!("{:x}", password_hash);
     conn.run(move |conn: &mut PgConnection| {
         use crate::schema::users;
 
         let user_id = users::table
             .select(users::user_id)
             .filter(users::username.eq(&basic_auth.username))
-            .filter(users::password.eq(basic_auth.password.expose_secret()))
+            .filter(users::password_hash.eq(&password_hash))
             .first::<Uuid>(conn)
             .optional()
             .context("Failed to perform a query to validate auth credentials.")?
