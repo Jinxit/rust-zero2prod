@@ -49,8 +49,16 @@ async fn validate_credentials(
 ) -> Result<AuthenticatedUser, (Status, anyhow::Error)> {
     let user: Option<User> = get_stored_credentials(conn, basic_auth.username).await?;
 
-    let user = user.or_status(Status::Unauthorized, "Unknown username.")?;
-    let expected_password_hash = Secret::new(user.password_hash);
+    let expected_password_hash = Secret::new(
+        user.as_ref()
+            .map(|user| user.password_hash.clone())
+            .unwrap_or_else(|| {
+                "$argon2id$v=19$m=15000,t=2,p=1$\
+                gZiV/M1gPc22ElAH/Jh1Hw$\
+                CWOrkoo7oJBQ/iyh7uJ0LO2aLEfrHwTWllSAxT0zRno"
+                    .to_string()
+            }),
+    );
 
     spawn_blocking_with_tracing(move || {
         verify_password_hash(expected_password_hash, basic_auth.password)
@@ -58,6 +66,7 @@ async fn validate_credentials(
     .await
     .or_status(Status::InternalServerError, "Failed to spawn/join thread.")??;
 
+    let user = user.or_status(Status::Unauthorized, "Unknown username.")?;
     Ok(AuthenticatedUser {
         user_id: user.user_id,
         username: user.username,

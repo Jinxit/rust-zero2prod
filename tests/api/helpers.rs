@@ -1,5 +1,5 @@
 use argon2::password_hash::SaltString;
-use argon2::{Argon2, PasswordHasher};
+use argon2::{Algorithm, Argon2, Params, PasswordHasher, Version};
 use async_trait::async_trait;
 use diesel::prelude::*;
 use diesel::{Connection, PgConnection};
@@ -99,10 +99,14 @@ impl TestUser {
     fn store(&self, conn: &PgConnection) {
         use zero2prod::schema::users;
         let salt = SaltString::generate(&mut rand::thread_rng());
-        let password_hash = Argon2::default()
-            .hash_password(self.password.as_bytes(), &salt)
-            .unwrap()
-            .to_string();
+        let password_hash = Argon2::new(
+            Algorithm::Argon2id,
+            Version::V0x13,
+            Params::new(15000, 2, 1, None).unwrap(),
+        )
+        .hash_password(self.password.as_bytes(), &salt)
+        .unwrap()
+        .to_string();
 
         diesel::insert_into(users::table)
             .values(NewUser {
