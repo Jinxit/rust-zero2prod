@@ -14,11 +14,11 @@ use rocket::Request;
 use secrecy::{ExposeSecret, Secret};
 use uuid::Uuid;
 
+// prevents construction outside of this module
+#[non_exhaustive]
 pub struct AuthenticatedUser {
     pub user_id: Uuid,
     pub username: String,
-    // prevents construction outside of this module
-    _private: (),
 }
 
 #[async_trait]
@@ -70,7 +70,6 @@ async fn validate_credentials(
     Ok(AuthenticatedUser {
         user_id: user.user_id,
         username: user.username,
-        _private: (),
     })
 }
 

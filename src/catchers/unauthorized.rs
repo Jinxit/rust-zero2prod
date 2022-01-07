@@ -8,8 +8,8 @@ pub fn unauthorized_request_credentials() -> RequestBasicAuth {
 
 struct RequestBasicAuthHeader;
 
-impl<'h> Into<Header<'h>> for RequestBasicAuthHeader {
-    fn into(self) -> Header<'h> {
+impl<'h> From<RequestBasicAuthHeader> for Header<'h> {
+    fn from(_: RequestBasicAuthHeader) -> Self {
         Header {
             name: "WWW-Authenticate".into(),
             value: r#"Basic realm="publish""#.into(),
@@ -25,10 +25,16 @@ pub struct RequestBasicAuth {
 }
 
 impl RequestBasicAuth {
-    pub fn new() -> RequestBasicAuth {
+    fn new() -> RequestBasicAuth {
         RequestBasicAuth {
             inner: (),
             basic_auth: RequestBasicAuthHeader,
         }
+    }
+}
+
+impl Default for RequestBasicAuth {
+    fn default() -> Self {
+        Self::new()
     }
 }
